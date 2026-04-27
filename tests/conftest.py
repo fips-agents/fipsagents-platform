@@ -41,4 +41,7 @@ async def client(sqlite_env: str) -> AsyncClient:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://platform.test") as c:
         async with app.router.lifespan_context(app):
+            # Stash the app on the client so tests can reach app.state stores
+            # for seeding (traces have no POST endpoint).
+            c._test_app = app  # type: ignore[attr-defined]
             yield c

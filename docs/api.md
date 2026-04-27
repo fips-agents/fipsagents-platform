@@ -87,13 +87,90 @@ Query parameters:
 
 Returns an array of `{window_start, window_end, agent_type, thumbs_up, thumbs_down, total}`.
 
-## Sessions (proof point pending)
+## Sessions
 
-`POST /v1/sessions`, `GET /v1/sessions/{session_id}`, `DELETE /v1/sessions/{session_id}` — all return `501 Not Implemented`. Tracked in [#1](https://github.com/fips-agents/fipsagents-platform/issues/1).
+### POST /v1/sessions
 
-## Traces (proof point pending)
+Body (all fields optional):
 
-`GET /v1/traces`, `GET /v1/traces/{trace_id}` — return `501 Not Implemented`. Tracked in [#1](https://github.com/fips-agents/fipsagents-platform/issues/1).
+```json
+{ "session_id": "my-session-001" }
+```
+
+`session_id` must be 1-128 characters: letters, digits, hyphens, underscores. When omitted, the server generates `sess_<16-hex>`. Returns `201 Created` with `{"session_id": "..."}`.
+
+### GET /v1/sessions/{session_id}
+
+Returns `{"session_id", "messages"}` where `messages` is the persisted message history (empty array for a freshly-created session). `404 Not Found` if the session does not exist.
+
+### PUT /v1/sessions/{session_id}
+
+Persist the message history for a session. Upsert semantics — if the session does not exist, it is created.
+
+Body:
+
+```json
+{ "messages": [ {"role": "user", "content": "..."}, {"role": "assistant", "content": "..."} ] }
+```
+
+Returns `{"session_id": "...", "saved": true}`. This endpoint is the extension over the per-agent server's wire shape — required for an agent-side `HttpSessionStore` to delegate `SessionStore.save()` over the wire.
+
+### HEAD /v1/sessions/{session_id}
+
+Existence probe. `200 OK` if the session exists, `404 Not Found` if not. No response body.
+
+### DELETE /v1/sessions/{session_id}
+
+Returns `{"deleted": true}`. `404 Not Found` if the session does not exist.
+
+## Traces
+
+### POST /v1/traces
+
+Persist a completed trace. Upsert semantics — re-posting the same `trace_id` overwrites the prior record (matches `SqliteTraceStore.save_trace()` / `PostgresTraceStore.save_trace()`).
+
+Body mirrors the `Trace` dataclass:
+
+```json
+{
+  "trace_id": "trace_...",
+  "started_at": "2026-04-27T18:00:00+00:00",
+  "ended_at": "2026-04-27T18:00:01+00:00",
+  "model": "gpt-oss-20b",
+  "session_id": "sess_...",
+  "status": "ok",
+  "spans": [
+    {
+      "trace_id": "trace_...",
+      "span_id": "...",
+      "parent_span_id": null,
+      "name": "request",
+      "start_time": 0.0,
+      "end_time": 0.250,
+      "status": "ok",
+      "attributes": {},
+      "events": []
+    }
+  ]
+}
+```
+
+Returns `{"trace_id": "...", "saved": true}`. This endpoint is the extension over the per-agent server's wire shape — required for an agent-side `HttpTraceStore` to delegate `TraceStore.save_trace()` over the wire.
+
+### GET /v1/traces
+
+Query parameters:
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `limit` | int (1-1000) | optional, default 50 |
+| `offset` | int (≥0) | optional, default 0 |
+
+Returns an array of `TraceSummary` objects: `{trace_id, started_at, ended_at, model, session_id, status, duration_ms, span_count, tool_calls, prompt_tokens, completion_tokens}`. Ordered descending by `started_at`.
+
+### GET /v1/traces/{trace_id}
+
+Returns the full `Trace` including every `Span`: `{trace_id, started_at, ended_at, model, session_id, status, spans}`. `404 Not Found` if the trace does not exist.
 
 ## Auth
 

@@ -20,8 +20,8 @@ src/fipsagents_platform/
   store_factory.py   # Builds fipsagents.server stores from config
   routes/
     feedback.py      # /v1/feedback proof point (live)
-    sessions.py      # /v1/sessions (501 -- proof point pending)
-    traces.py        # /v1/traces (501 -- proof point pending)
+    sessions.py      # /v1/sessions proof point (live)
+    traces.py        # /v1/traces proof point (live)
 ```
 
 ## Persistence
@@ -45,7 +45,7 @@ JWKS is cached for `PLATFORM_KEYCLOAK_JWKS_CACHE_SECONDS` (default 300). On a `k
 
 ## Wire shape
 
-All endpoints mirror `fipsagents.server.app`'s per-agent endpoints exactly. The point is that an `HttpFeedbackStore` on the agent side (agent-template#114) can route to either the per-agent endpoint or the platform endpoint with no contract difference.
+All endpoints mirror `fipsagents.server.app`'s per-agent endpoints exactly, with three extensions for write-side parity (`PUT /v1/sessions/{id}`, `HEAD /v1/sessions/{id}`, `POST /v1/traces`). The point is that an `HttpFeedbackStore` / `HttpSessionStore` / `HttpTraceStore` on the agent side (agent-template#114) can route to either the per-agent endpoint or the platform endpoint with no contract difference, and fully replace the in-process SQLite/Postgres backend.
 
 | Endpoint | Status | Notes |
 | --- | --- | --- |
@@ -54,11 +54,14 @@ All endpoints mirror `fipsagents.server.app`'s per-agent endpoints exactly. The 
 | `GET /v1/feedback/{id}` | live | New endpoint -- not on the per-agent server. Used by the agent-side `HttpFeedbackStore.get()` |
 | `PATCH /v1/feedback/{id}` | live | Partial update; `null` means "leave unchanged" |
 | `GET /v1/feedback/stats` | live | Aggregations grouped by `agent_type` and time window |
-| `POST /v1/sessions` | 501 | proof point pending |
-| `GET /v1/sessions/{id}` | 501 | proof point pending |
-| `DELETE /v1/sessions/{id}` | 501 | proof point pending |
-| `GET /v1/traces` | 501 | proof point pending |
-| `GET /v1/traces/{id}` | 501 | proof point pending |
+| `POST /v1/sessions` | live | Returns `{"session_id": "sess_..."}`; accepts optional `session_id` |
+| `GET /v1/sessions/{id}` | live | Returns `{"session_id", "messages"}`; 404 if missing |
+| `PUT /v1/sessions/{id}` | live | Save messages (upsert); body: `{"messages": [...]}`. Extension over per-agent shape — required for `HttpSessionStore` |
+| `HEAD /v1/sessions/{id}` | live | 200 if exists, 404 if not. No body. Extension for `HttpSessionStore.exists()` |
+| `DELETE /v1/sessions/{id}` | live | Returns `{"deleted": true}`; 404 if missing |
+| `POST /v1/traces` | live | Save a trace (upsert); body mirrors the `Trace` dataclass. Extension over per-agent shape — required for `HttpTraceStore` |
+| `GET /v1/traces` | live | List `TraceSummary` objects; `limit` (1-1000), `offset` |
+| `GET /v1/traces/{id}` | live | Full `Trace` with all spans; 404 if missing |
 
 ## Topology
 

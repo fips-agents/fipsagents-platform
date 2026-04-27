@@ -20,12 +20,16 @@ async def test_readyz_ok(client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_unimplemented_sessions(client) -> None:
+async def test_sessions_route_wired(client) -> None:
+    """POST /v1/sessions creates a session (not a 501 stub anymore)."""
     resp = await client.post("/v1/sessions")
-    assert resp.status_code == 501
+    assert resp.status_code == 201
+    assert resp.json()["session_id"].startswith("sess_")
 
 
 @pytest.mark.asyncio
-async def test_unimplemented_traces(client) -> None:
+async def test_traces_route_wired(client) -> None:
+    """GET /v1/traces returns a list (not a 501 stub anymore)."""
     resp = await client.get("/v1/traces")
-    assert resp.status_code == 501
+    assert resp.status_code == 200
+    assert resp.json() == []

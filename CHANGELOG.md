@@ -4,6 +4,22 @@ All notable changes to `fipsagents-platform` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0] - 2026-04-27
+
+Sessions and traces proof points. Closes [#1](https://github.com/fips-agents/fipsagents-platform/issues/1)'s remaining checkboxes — the platform service is feature-complete instead of "feedback only," and the wire shape is wide enough to fully back an agent-side `HttpSessionStore` / `HttpTraceStore` (agent-template#114).
+
+### Added
+
+- **Sessions endpoints (full ABC coverage).** `POST /v1/sessions` (create), `GET /v1/sessions/{session_id}` (load), `PUT /v1/sessions/{session_id}` (save, upsert), `HEAD /v1/sessions/{session_id}` (exists), `DELETE /v1/sessions/{session_id}`. Wraps `fipsagents.server.sessions.SessionStore` (SQLite + Postgres backends).
+- **Traces endpoints (full ABC coverage).** `POST /v1/traces` (save_trace, upsert), `GET /v1/traces` (`limit`/`offset` paged summaries), `GET /v1/traces/{trace_id}` (full trace with all spans). Wraps `fipsagents.server.tracing.TraceStore`.
+- **Tests.** 25 new end-to-end tests against a real SQLite-backed `SessionStore` / `TraceStore`. No mocks. Total suite: 38 tests.
+- **Store factories.** `build_session_store()` and `build_trace_store()` in `store_factory.py`, mirroring the existing `build_feedback_store()`.
+
+### Changed
+
+- The `/v1/sessions` and `/v1/traces` endpoints no longer return `501 Not Implemented`. The wire shape is now a superset of the per-agent endpoints in `fipsagents.server.app` — it adds `PUT /v1/sessions/{id}`, `HEAD /v1/sessions/{id}`, and `POST /v1/traces` so an agent-side `HttpSessionStore` / `HttpTraceStore` can be a drop-in replacement for the in-process SQLite/Postgres backends.
+- `create_app()` reads its FastAPI `version` from `version.py` instead of a hardcoded literal, so `release.sh`'s version bump is the single source of truth.
+
 ## [0.1.0] - 2026-04-27
 
 Initial release. Bootstrap commit for the cross-agent platform service decided in [agent-template#112](https://github.com/fips-agents/agent-template/issues/112).
