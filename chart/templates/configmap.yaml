@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fipsagents-platform.fullname" . }}-config
+  labels:
+    {{- include "fipsagents-platform.labels" . | nindent 4 }}
+data:
+  PLATFORM_BACKEND: {{ .Values.storage.backend | quote }}
+  PLATFORM_SQLITE_PATH: {{ .Values.storage.sqlitePath | quote }}
+  PLATFORM_AUTH_MODE: {{ .Values.auth.mode | quote }}
+  PLATFORM_KEYCLOAK_ISSUER: {{ .Values.auth.keycloakIssuer | quote }}
+  PLATFORM_KEYCLOAK_AUDIENCE: {{ .Values.auth.keycloakAudience | quote }}
+  PLATFORM_LOG_LEVEL: {{ .Values.logLevel | quote }}

@@ -1,0 +1,61 @@
+# Default values for fipsagents-platform.
+
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+image:
+  repository: fipsagents-platform
+  tag: latest
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Storage backend. "sqlite" is intended for dev/edge only — multi-replica
+# deployments require "postgres".
+storage:
+  backend: sqlite        # "sqlite" or "postgres"
+  sqlitePath: /data/platform.db
+  databaseUrl: ""        # eg postgresql://user:pass@host:5432/db
+  # Reference an existing Secret with PLATFORM_DATABASE_URL set.
+  databaseUrlSecretRef:
+    name: ""
+    key: PLATFORM_DATABASE_URL
+
+# Authentication. "none" is appropriate when the gateway in front already
+# enforces authn and the platform is reachable only via the cluster network.
+# "keycloak" validates inbound JWTs against the same realm as the gateway.
+auth:
+  mode: none             # "none" or "keycloak"
+  keycloakIssuer: ""     # eg https://keycloak.apps.cluster.example.com/realms/agents
+  keycloakAudience: ""   # eg fipsagents-platform
+
+logLevel: INFO
+
+# Persistent storage for SQLite mode. Ignored when storage.backend=postgres.
+persistence:
+  enabled: false
+  storageClassName: ""
+  size: 1Gi
+
+probes:
+  enabled: true
+
+service:
+  port: 8080
+
+route:
+  enabled: false
+  host: ""
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+
+env: []

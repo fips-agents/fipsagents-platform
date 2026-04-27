@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fipsagents-platform
+description: Cross-agent platform service for fips-agents — centralizes feedback, sessions, and traces over REST.
+version: 0.1.0
+appVersion: 0.1.0
+type: application

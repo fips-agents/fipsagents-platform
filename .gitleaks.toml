@@ -1,0 +1,14 @@
+[allowlist]
+  description = "Project-specific allowlist for false positives"
+
+  paths = [
+    '''\/tests?\/fixtures\/''',
+    '''docs\/.*\.md$''',
+  ]
+
+  regexes = [
+    '''REDACTED''',
+    '''YOUR_.*_HERE''',
+    '''<your-.*-here>''',
+    '''REPLACE_WITH_YOUR''',
+  ]
