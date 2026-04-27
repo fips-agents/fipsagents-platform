@@ -62,9 +62,13 @@ if [[ "$PY_VER" != "$VERSION" || "$TOML_VER" != "$VERSION" ]]; then
 fi
 
 git add "$VERSION_PY" "$PYPROJECT"
-git commit -m "release: v$VERSION — $DESCRIPTION
+if git diff --cached --quiet; then
+  echo "Version files already at $VERSION; tagging current HEAD without a release commit."
+else
+  git commit -m "release: v$VERSION — $DESCRIPTION
 
 Assisted-by: Claude Code (Opus 4.7)"
+fi
 
 git tag -a "v$VERSION" -m "v$VERSION — $DESCRIPTION"
 
