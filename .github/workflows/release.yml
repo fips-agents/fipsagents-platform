@@ -1,0 +1,73 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches version files
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          PY_VER="$(python3 -c 'exec(open("src/fipsagents_platform/version.py").read()); print(__version__)')"
+          TOML_VER="$(grep '^version =' pyproject.toml | head -1 | sed -E 's/version = "([^"]+)"/\1/')"
+          if [[ "$PY_VER" != "$TAG" || "$TOML_VER" != "$TAG" ]]; then
+            echo "::error::version mismatch: tag=$TAG py=$PY_VER toml=$TOML_VER"
+            exit 1
+          fi
+
+  test:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,postgres]"
+
+      - name: Test
+        run: pytest -v
+
+  create-release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          # Pull the body of the matching CHANGELOG section, stopping at the next ## heading.
+          awk -v ver="$TAG" '
+            /^## \[/ {
+              if (in_section) exit
+              if ($0 ~ "^## \\[" ver "\\]") { in_section = 1; next }
+            }
+            in_section { print }
+          ' CHANGELOG.md > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "Release v$TAG. See CHANGELOG.md for details." > release-notes.md
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          draft: false
+          prerelease: false

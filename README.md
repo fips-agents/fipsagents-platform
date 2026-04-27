@@ -31,6 +31,13 @@ Early. The repo bootstraps with **feedback** as the proof point — full CRUD, s
 
 See open issues for the roadmap.
 
+## Documentation
+
+- [Architecture](docs/architecture.md) — code layout, persistence reuse, auth modes, wire shape, topology
+- [API Reference](docs/api.md) — endpoint summary (live OpenAPI at `/docs` when the service is running)
+- [Deployment](docs/deployment.md) — Helm chart, env vars, Postgres considerations
+- [CHANGELOG](CHANGELOG.md)
+
 ## Quickstart (dev)
 
 ```bash
