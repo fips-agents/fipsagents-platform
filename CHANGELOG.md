@@ -4,6 +4,18 @@ All notable changes to `fipsagents-platform` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1] - 2026-04-28
+
+Cumulative-cost read companion for `PATCH /v1/sessions/{id}`. Closes the HTTP-backend cumulative gap that the 0.14.1 cluster smoke spotlighted: without a read endpoint, agent-side `_persist_cost_data` could only write deltas (last-write-wins per top-level key). Tracked as [fipsagents-platform#4](https://github.com/fips-agents/fipsagents-platform/issues/4).
+
+### Added
+
+- **`GET /v1/sessions/{session_id}/cost_data`.** Returns `{"session_id": ..., "cost_data": {...}}` for existing sessions; 404 when the session is missing. Uses `store.exists()` to distinguish a missing session from one with empty accumulator state. Auth identical to the existing GET. 3 new tests; suite total 46.
+
+### Notes
+
+- Pairs with `fipsagents>=0.14.2` on the agent side, where `HttpSessionStore.get_cost_data` consumes this endpoint. Older agents (<=0.14.1) are unaffected — they never call it. Older platforms (<=0.2.0) paired with newer agents 404 cleanly and degrade to last-write-wins.
+
 ## [0.2.0] - 2026-04-27
 
 Sessions and traces proof points. Closes [#1](https://github.com/fips-agents/fipsagents-platform/issues/1)'s remaining checkboxes — the platform service is feature-complete instead of "feedback only," and the wire shape is wide enough to fully back an agent-side `HttpSessionStore` / `HttpTraceStore` (agent-template#114).
