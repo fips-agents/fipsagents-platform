@@ -59,6 +59,28 @@ async def get_session(
     return JSONResponse({"session_id": session_id, "messages": messages})
 
 
+@router.get("/{session_id}/cost_data")
+async def get_session_cost_data(
+    session_id: str,
+    request: Request,
+    _user: str = Depends(require_user),
+) -> JSONResponse:
+    """Return the accumulated ``cost_data`` for a session.
+
+    Symmetric companion to :func:`update_session`. The agent-side per-turn
+    cost accumulator reads the current cumulative totals via this endpoint
+    before computing the next merge, so HTTP-backed deployments converge on
+    the same cumulative semantics that SQLite/Postgres backends provide
+    natively. 404 when the session does not exist; 200 with an empty
+    ``cost_data`` dict when the session exists but has no writes yet.
+    """
+    store = request.app.state.session_store
+    if not await store.exists(session_id):
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    cost_data = await store.get_cost_data(session_id)
+    return JSONResponse({"session_id": session_id, "cost_data": cost_data})
+
+
 @router.put("/{session_id}")
 async def save_session(
     session_id: str,

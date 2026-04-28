@@ -231,3 +231,38 @@ async def test_patch_session_returns_messages(client) -> None:
     )
     assert resp.status_code == 200
     assert resp.json() == {"session_id": sid, "messages": messages}
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/sessions/{session_id}/cost_data — read companion to PATCH.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_cost_data_after_patches(client) -> None:
+    """GET returns the cumulative shallow-merged cost_data."""
+    sid = "cost-read"
+    await client.post("/v1/sessions", json={"session_id": sid})
+    await client.patch(f"/v1/sessions/{sid}", json={"cost_data": {"a": 1}})
+    await client.patch(f"/v1/sessions/{sid}", json={"cost_data": {"b": 2, "a": 5}})
+
+    resp = await client.get(f"/v1/sessions/{sid}/cost_data")
+    assert resp.status_code == 200
+    assert resp.json() == {"session_id": sid, "cost_data": {"a": 5, "b": 2}}
+
+
+@pytest.mark.asyncio
+async def test_get_cost_data_empty_when_no_writes(client) -> None:
+    """Existing session with no PATCH writes returns 200 + empty dict."""
+    sid = "cost-empty"
+    await client.post("/v1/sessions", json={"session_id": sid})
+
+    resp = await client.get(f"/v1/sessions/{sid}/cost_data")
+    assert resp.status_code == 200
+    assert resp.json() == {"session_id": sid, "cost_data": {}}
+
+
+@pytest.mark.asyncio
+async def test_get_cost_data_404_when_session_missing(client) -> None:
+    resp = await client.get("/v1/sessions/never-existed/cost_data")
+    assert resp.status_code == 404
