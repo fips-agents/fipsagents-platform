@@ -26,7 +26,7 @@ classifiers = [
 ]
 keywords = ["ai", "agent", "fips", "openshift", "fastapi"]
 dependencies = [
-    "fipsagents[feedback,server]>=0.12.0",
+    "fipsagents[feedback,server]>=0.14.0",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
     "pydantic>=2.0",
