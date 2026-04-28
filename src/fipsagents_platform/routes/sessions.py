@@ -24,6 +24,17 @@ class SaveSessionRequest(BaseModel):
     messages: list[dict] = Field(default_factory=list)
 
 
+class UpdateSessionRequest(BaseModel):
+    """Request body for PATCH /v1/sessions/{session_id}.
+
+    Partial update — only the fields present are touched. ``cost_data`` is
+    shallow-merged with any existing cost data on the platform side
+    (write-wins per top-level key), matching ``SessionStore.update()``.
+    """
+
+    cost_data: dict | None = None
+
+
 @router.post("", status_code=201)
 async def create_session(
     request: Request,
@@ -64,6 +75,30 @@ async def save_session(
     store = request.app.state.session_store
     await store.save(session_id, body.messages)
     return JSONResponse({"session_id": session_id, "saved": True})
+
+
+@router.patch("/{session_id}")
+async def update_session(
+    session_id: str,
+    body: UpdateSessionRequest,
+    request: Request,
+    _user: str = Depends(require_user),
+) -> JSONResponse:
+    """Partial update for a session (currently: ``cost_data``).
+
+    Delegates to ``SessionStore.update()`` which shallow-merges the supplied
+    ``cost_data`` with any existing accumulator state. Returns the full
+    session shape so the agent side can observe the merged result.
+    """
+    store = request.app.state.session_store
+    updated = await store.update(session_id, cost_data=body.cost_data)
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    messages = await store.load(session_id)
+    return JSONResponse({
+        "session_id": session_id,
+        "messages": messages or [],
+    })
 
 
 @router.head("/{session_id}")

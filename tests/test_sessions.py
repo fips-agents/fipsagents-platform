@@ -7,7 +7,27 @@ path. No mocks.
 
 from __future__ import annotations
 
+import json
+
 import pytest
+
+
+async def _read_cost_data(client, session_id: str) -> dict:
+    """Read ``cost_data`` straight out of the SQLite store.
+
+    The public ``GET /v1/sessions/{id}`` route only returns messages, but the
+    PATCH route is about ``cost_data``. We peek at the underlying aiosqlite
+    connection via ``app.state.session_store`` to confirm the merge happened.
+    """
+    store = client._test_app.state.session_store
+    db = await store._get_db()
+    cursor = await db.execute(
+        "SELECT cost_data FROM sessions WHERE session_id = ?",
+        (session_id,),
+    )
+    row = await cursor.fetchone()
+    assert row is not None, f"session {session_id!r} not found in store"
+    return json.loads(row[0]) if row[0] else {}
 
 
 @pytest.mark.asyncio
@@ -138,3 +158,76 @@ async def test_head_missing_session_returns_404(client) -> None:
     resp = await client.head("/v1/sessions/not-here")
     assert resp.status_code == 404
     assert resp.content == b""
+
+
+# ---------------------------------------------------------------------------
+# PATCH /v1/sessions/{session_id} — partial update for cost_data accumulator.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_patch_session_updates_cost_data(client) -> None:
+    """Two PATCH calls shallow-merge per top-level key (write-wins)."""
+    sid = "patch-cost"
+    await client.post("/v1/sessions", json={"session_id": sid})
+
+    first = await client.patch(f"/v1/sessions/{sid}", json={"cost_data": {"a": 1}})
+    assert first.status_code == 200
+    body = first.json()
+    assert body == {"session_id": sid, "messages": []}
+
+    second = await client.patch(
+        f"/v1/sessions/{sid}", json={"cost_data": {"b": 2, "a": 5}}
+    )
+    assert second.status_code == 200
+
+    merged = await _read_cost_data(client, sid)
+    assert merged == {"a": 5, "b": 2}
+
+
+@pytest.mark.asyncio
+async def test_patch_session_404_when_missing(client) -> None:
+    resp = await client.patch(
+        "/v1/sessions/never-existed", json={"cost_data": {"a": 1}}
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_patch_session_none_cost_data(client) -> None:
+    """``cost_data: null`` is a no-op merge but still confirms existence."""
+    sid = "patch-noop"
+    await client.post("/v1/sessions", json={"session_id": sid})
+    await client.patch(f"/v1/sessions/{sid}", json={"cost_data": {"seed": 1}})
+
+    resp = await client.patch(f"/v1/sessions/{sid}", json={"cost_data": None})
+    assert resp.status_code == 200
+
+    # Existing accumulator state is left alone.
+    assert await _read_cost_data(client, sid) == {"seed": 1}
+
+
+@pytest.mark.asyncio
+async def test_patch_session_404_when_missing_with_none_cost_data(client) -> None:
+    """Even with ``cost_data: null`` the route must 404 for unknown sessions."""
+    resp = await client.patch(
+        "/v1/sessions/ghost", json={"cost_data": None}
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_patch_session_returns_messages(client) -> None:
+    """PATCH echoes the persisted message history alongside the merge result."""
+    sid = "patch-with-history"
+    messages = [
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": "hi"},
+    ]
+    await client.put(f"/v1/sessions/{sid}", json={"messages": messages})
+
+    resp = await client.patch(
+        f"/v1/sessions/{sid}", json={"cost_data": {"prompt_tokens": 42}}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"session_id": sid, "messages": messages}
